@@ -9,8 +9,4 @@ def word_count(text):
 
 def initials(name):
     """Upper-case first letter of each part of a name: 'ada lovelace' -> 'AL'."""
-    parts = name.split()
-    result = ""
-    for part in parts:
-        result += part[0].upper()
-    return result
+    return "".join(part[0].upper() for part in name.split())

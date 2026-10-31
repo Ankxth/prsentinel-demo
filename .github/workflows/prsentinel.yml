@@ -1,0 +1,210 @@
+name: PRSentinel
+
+# Scores a pull request in THIS repository with PRSentinel and leaves one
+# comment on it.
+#
+# PRSentinel itself lives in a different repository. This workflow checks it out
+# next to the code, installs it, and runs it on the changed .py files. It is the
+# same job as .github/workflows/prsentinel.yml in the PRSentinel repository,
+# changed only so that the tool and the code being scored can be two separate
+# repositories.
+#
+# Settings, under Settings -> Secrets and variables -> Actions:
+#
+#   secret    GROQ_API_KEY            required. The only key the model call needs.
+#   variable  PRSENTINEL_REPO         optional. owner/name of the PRSentinel
+#                                     repository. Default Ankxth/prsentinel.
+#   variable  PRSENTINEL_REF          optional. Branch of it to use. Default main.
+#   secret    PRSENTINEL_READ_TOKEN   only if the PRSentinel repository is
+#                                     private: a token that can read it.
+#
+# It never runs on pull_request_target, and it skips pull requests from forks,
+# for the same reason the original does: the job holds the Groq key, and a fork's
+# code must never run next to it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: prsentinel-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  score:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+    steps:
+      # fetch-depth 0 so both commits are here and git show can reach either.
+      - name: Get the code being scored
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The tool goes into a folder of its own. git diff below compares two
+      # commits of this repository, so nothing in that folder is ever scored.
+      - name: Get PRSentinel
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.PRSENTINEL_REPO || 'Ankxth/prsentinel' }}
+          ref: ${{ vars.PRSENTINEL_REF || 'main' }}
+          token: ${{ secrets.PRSENTINEL_READ_TOKEN || github.token }}
+          path: .prsentinel
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install PRSentinel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .prsentinel/requirements.txt
+          python -m pip install -e .prsentinel
+
+      - name: Work out which files to score
+        id: files
+        run: |
+          set -uo pipefail
+          # Only .py files that still exist on the new side, nothing under
+          # tests/, at most 5. The same rules as the original workflow.
+          git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" \
+            -- '*.py' > py_files.txt
+          git_code=$?
+          if [ "$git_code" -ne 0 ]; then
+            echo "Could not compare $BASE_SHA against $HEAD_SHA." >&2
+            exit "$git_code"
+          fi
+
+          grep -v '^tests/' py_files.txt | sed '/^$/d' > all_files.txt || true
+          TOTAL=$(wc -l < all_files.txt | tr -d ' ')
+          head -5 all_files.txt > scored_files.txt
+
+          if [ "$TOTAL" -gt 5 ]; then
+            MISSING=$(( TOTAL - 5 ))
+            echo "skipped=$MISSING of $TOTAL changed .py files were not scored, because at most 5 are scored per pull request so the cost of the shared key stays bounded" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "changed .py files to consider: $TOTAL"
+
+      # The one step that sees the key. No GEMINI_API_KEY and --no-fallback, so
+      # every answer comes from one model. No --repair: nobody's code or tests
+      # are ever edited.
+      - name: Run PRSentinel on each file
+        id: run
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          set -uo pipefail
+          mkdir -p work
+          : > scored.tsv
+          STOPPED=""
+
+          index=0
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            index=$(( index + 1 ))
+            mkdir -p "work/$index"
+
+            git show "$BASE_SHA:$path" > "work/$index/before.py" \
+              || { echo "no base version of $path, skipping"; continue; }
+            git show "$HEAD_SHA:$path" > "work/$index/after.py" \
+              || { echo "no head version of $path, skipping"; continue; }
+
+            set +e
+            python -m prsentinel.pipeline "work/$index/before.py" \
+                "work/$index/after.py" \
+                --name "prsentinel_$index" \
+                --no-fallback \
+                --mutation
+            code=$?
+            set -e
+
+            if [ "$code" = "6" ]; then
+              STOPPED="Groq's daily allowance ran out while scoring $path, so the run stopped and there is no result to report."
+              break
+            fi
+            if [ "$code" != "0" ]; then
+              echo "PRSentinel exited $code on $path" >&2
+              exit "$code"
+            fi
+
+            printf '%s\t%s\n' "$index" "$path" >> scored.tsv
+          done < scored_files.txt
+
+          echo "stopped=$STOPPED" >> "$GITHUB_OUTPUT"
+
+      - name: Build the comment
+        env:
+          SKIPPED: ${{ steps.files.outputs.skipped }}
+          STOPPED: ${{ steps.run.outputs.stopped }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          args=()
+          while IFS=$'\t' read -r index path; do
+            [ -n "$index" ] || continue
+            if [ -f "reports/prsentinel_$index.json" ]; then
+              args+=(--report "reports/prsentinel_$index.json" --label "$path")
+            fi
+          done < scored.tsv
+
+          if [ -n "$STOPPED" ]; then
+            args+=(--no-result "$STOPPED")
+          elif [ "${#args[@]}" -eq 0 ]; then
+            args+=(--no-result "No changed .py file outside tests/ was found in this pull request, so there was nothing to score.")
+          fi
+          if [ -n "$SKIPPED" ]; then
+            args+=(--skipped "$SKIPPED")
+          fi
+
+          python .prsentinel/scripts/make_pr_comment.py "${args[@]}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pr "$PR" \
+            --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA" \
+            > comment.md
+          cat comment.md
+
+      - name: Post the comment, or update the one already there
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- prsentinel-report -->';
+            const body = fs.readFileSync('comment.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const existing = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const mine = existing.data.find((c) => c.body?.includes(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+              core.info(`Updated PRSentinel's comment on #${issue_number}.`);
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              core.info(`Left a PRSentinel comment on #${issue_number}.`);
+            }
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prsentinel-reports-${{ github.run_id }}
+          path: |
+            reports/*.json
+            reports/*.md
+            comment.md
+          retention-days: 14
+          if-no-files-found: warn

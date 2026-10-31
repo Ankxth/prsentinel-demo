@@ -1,13 +1,11 @@
 """Shopping cart helpers."""
 
 
-def add_item_to_cart(item, cart=None):
+def add_item_to_cart(item, cart=[]):
     """Add an item to the cart and return the cart.
 
     Called without a cart, it starts a new, empty one.
     """
-    if cart is None:
-        cart = []
     cart.append(item)
     return cart
 

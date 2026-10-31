@@ -11,4 +11,4 @@ def best_offer(codes):
     live = [code for code in codes if code in OFFERS]
     if not live:
         return None
-    return min(live, key=lambda code: OFFERS[code])
+    return min(live, key=lambda code: -OFFERS[code])

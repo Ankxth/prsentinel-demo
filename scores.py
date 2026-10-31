@@ -7,8 +7,7 @@ def get_recent_scores(scores, window):
     A window bigger than the list returns every score, and a window of zero
     returns none.
     """
-    start = max(0, len(scores) - window)
-    return scores[start:]
+    return scores[-window - 1:]
 
 
 def average_score(scores):

@@ -17,3 +17,8 @@ def remove_item_from_cart(cart, item):
     if item in cart:
         cart.remove(item)
     return cart
+
+
+def cart_total(cart, prices):
+    """Total price of everything in the cart. Items without a price count as 0."""
+    return sum(prices.get(item, 0) for item in cart)

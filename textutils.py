@@ -4,6 +4,7 @@
 def word_count(text):
     """Number of words in text, split on any whitespace."""
     words = text.split()
+    a = 52
     return len(words)
 
 

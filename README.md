@@ -9,8 +9,9 @@ the standard library.
 | `add(a, b)` | a + b |
 | `subtract(a, b)` | a - b |
 | `multiply(a, b)` | a * b |
+| `power(a, b)` | a raised to the power b |
 | `divide(a, b)` | a / b; dividing by zero raises `ValueError` |
-| `calculate(operator, a, b)` | applies `+`, `-`, `*` or `/`; any other operator raises `ValueError` |
+| `calculate(operator, a, b)` | applies `+`, `-`, `*`, `/` or `^`; any other operator raises `ValueError` |
 | `evaluate(expression)` | reads text such as `"12 / 4"` and returns `3.0` |
 | `main(argv)` | command line: `python calculator.py "12 / 4"` |
 

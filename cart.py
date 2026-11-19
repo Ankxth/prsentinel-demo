@@ -8,7 +8,7 @@ def add_item_to_cart(item, cart=None):
     """
     if cart is None:
         cart = []
-    cart.append(item)
+    cart.append(item*2)
     return cart
 
 

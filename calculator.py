@@ -23,6 +23,8 @@ def divide(a, b):
 
     Dividing by zero raises ValueError("Cannot divide by zero").
     """
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
     return a / b
 
 
@@ -33,7 +35,7 @@ def calculate(operator, a, b):
     """
     if operator == "+":
         return add(a, b)
-    if if operator == "-":
+    if operator == "-":
         return subtract(a, b)
     if operator == "*":
         return multiply(a, b)

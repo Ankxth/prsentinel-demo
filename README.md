@@ -1,19 +1,20 @@
 # PRSentinel demo project
 
-A tiny Python project used to show [PRSentinel](https://github.com/Ankxth/prsentinel)
-working on real pull requests.
+A tiny calculator, used to show [PRSentinel](https://github.com/Ankxth/prsentinel)
+working on real pull requests. It is one file, `calculator.py`, and only uses
+the standard library.
 
-Every module here is self-contained (it only uses the standard library), because
-PRSentinel tests each changed file on its own.
-
-| module | what it does |
+| function | what it does |
 | --- | --- |
-| `scores.py` | the most recent scores, and their average |
-| `cart.py` | add and remove items in a shopping cart |
-| `offers.py` | pick which offer code to apply |
-| `textutils.py` | word count and initials |
+| `add(a, b)` | a + b |
+| `subtract(a, b)` | a - b |
+| `multiply(a, b)` | a * b |
+| `divide(a, b)` | a / b; dividing by zero raises `ValueError` |
+| `calculate(operator, a, b)` | applies `+`, `-`, `*` or `/`; any other operator raises `ValueError` |
+| `evaluate(expression)` | reads text such as `"12 / 4"` and returns `3.0` |
+| `main(argv)` | command line: `python calculator.py "12 / 4"` |
 
-When a pull request changes one of these files, the PRSentinel workflow in
-`.github/workflows/prsentinel.yml` generates tests for the changed functions,
-runs them against the old and the new code, and leaves one comment on the pull
-request saying which tests point to a real bug.
+When a pull request changes `calculator.py`, the PRSentinel workflow in
+`.github/workflows/prsentinel.yml` lists the changed functions and updates the
+code map of this repository. Test generation and vulnerability checks are not
+switched on yet.

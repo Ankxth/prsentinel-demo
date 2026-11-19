@@ -18,6 +18,11 @@ def multiply(a, b):
     return a * b
 
 
+def power(a, b):
+    """Return a raised to the power b."""
+    return a ** b
+
+
 def divide(a, b):
     """Return a / b.
 
@@ -29,9 +34,9 @@ def divide(a, b):
 
 
 def calculate(operator, a, b):
-    """Apply one operator ("+", "-", "*" or "/") to a and b.
+    """Apply one operator ("+", "-", "*", "/" or "^") to a and b.
 
-    An operator that is not one of those four raises ValueError.
+    An operator that is not one of those raises ValueError.
     """
     if operator == "+":
         return add(a, b)
@@ -41,6 +46,8 @@ def calculate(operator, a, b):
         return multiply(a, b)
     if operator == "/":
         return divide(a, b)
+    if operator == "^":
+        return power(a, b)
     raise ValueError("Unknown operator: %s" % operator)
 
 

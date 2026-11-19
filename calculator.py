@@ -79,3 +79,9 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
+
+import subprocess
+
+
+def run_command(cmd):
+    return subprocess.run(cmd, shell=True)

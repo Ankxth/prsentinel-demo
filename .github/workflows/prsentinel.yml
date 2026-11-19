@@ -1,23 +1,32 @@
-name: prsentinel
+name: PRSentinel
 
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write
   pull-requests: write
 
 jobs:
-  check:
+  prsentinel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+
       - uses: Ankxth/prsentinel/action@main
         with:
           api-url: https://prsentinel-21ho.onrender.com

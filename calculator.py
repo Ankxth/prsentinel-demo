@@ -19,13 +19,13 @@ def power(a, b):
 
 
 def divide(a, b):
-    """Return a / b.
+    """Return a / b, rounded to 2 decimal places.
 
     Dividing by zero raises ValueError("Cannot divide by zero").
     """
     if b == 0:
         raise ValueError("Cannot divide by zero")
-    return a / b
+    return round(a / b, 2)
 
 
 def calculate(operator, a, b):

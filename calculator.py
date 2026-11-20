@@ -85,3 +85,7 @@ import subprocess
 
 def run_command(cmd):
     return subprocess.run(cmd, shell=True)
+
+def run_command(cmd):
+    import subprocess
+    return subprocess.run(cmd, shell=True)
